@@ -45,6 +45,7 @@ const animations: AnimationEntry[] = [
   { name: "arrow1" },
   { name: "glassStar" },
   { name: "gorilla" },
+  { name: "donut" },
 ];
 
 type Size = "s" | "m" | "l";
