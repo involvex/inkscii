@@ -45,6 +45,7 @@ const animations: AnimationEntry[] = [
   { name: "coin" },
   { name: "earth1" },
   { name: "saturn" },
+  { name: "gorilla" },
   { name: "orangutan" },
   { name: "shoes" },
   { name: "sleepEmoji" },
