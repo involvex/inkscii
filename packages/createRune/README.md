@@ -53,7 +53,7 @@ npx @rune-ascii/cli generate <video-file> [options]
 | `--threshold-low`  | `5`                    | Luminance floor (0–255)        |
 | `--threshold-high` | `235`                  | Luminance ceiling (0–255)      |
 | `--chars`          | `" .~-_=+*%#0oOxX@$"` | Character ramp (light to dark) |
-| `--font-ratio`     | `0.44`                 | Character aspect ratio         |
+| `--font-ratio`     | `0.6`                  | Character aspect ratio (charWidth/lineHeight) |
 | `--no-colored`     | —                      | Disable per-character color    |
 | `--output`         | current dir            | Output directory               |
 
@@ -72,14 +72,14 @@ npx @rune-ascii/cli generate ./wave.mov \
 
 ```
 Video file (.mp4, .mov, .mkv, .avi, .webm)
-  → ffmpeg extracts each frame as a PNG
-  → ImageMagick squishes frames vertically (text chars are taller than wide)
+  → ffmpeg extracts frames, scaling to target columns and applying
+    font-ratio height correction in a single pass
   → ImageMagick dumps every pixel's RGB values
   → Each pixel's luminance is mapped to an ASCII character
   → All frames are bundled into a single .rune.json file
 ```
 
-The character mapping uses a ramp like `" .~-_=+*%#0oOxX@$"` — spaces for the brightest areas, dense characters for the darkest. A font ratio (0.44) compensates for the fact that monospace characters are roughly twice as tall as they are wide.
+The character mapping uses a ramp like `" .~-_=+*%#0oOxX@$"` — spaces for the brightest areas, dense characters for the darkest. A font ratio (default `0.6`) compensates for the fact that monospace characters are taller than they are wide — the ratio should match `charWidth / lineHeight` of the rendering font (0.6 is correct for web rendering with `lineHeight: 1`).
 
 ## The `.rune.json` format
 
@@ -99,7 +99,7 @@ Every animation is a single JSON file containing all frames:
       "thresholdLow": 5,
       "thresholdHigh": 235,
       "chars": " .~-_=+*%#0oOxX@$",
-      "fontRatio": 0.44
+      "fontRatio": 0.6
     }
   },
   "frames": [
