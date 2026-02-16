@@ -11,6 +11,21 @@ export interface RuneGenerationSettings {
   thresholdHigh: number;
   chars: string;
   fontRatio: number;
+  colorStep?: number;
+  temporalHold?: number;
+}
+
+export interface RunePerformanceStats {
+  avgSegmentsPerFrame: number;
+  maxSegmentsPerFrame: number;
+  avgCharChangesPerFrame: number;
+  avgColorChangesPerFrame: number;
+  avgRowsWithCharChangesPerFrame: number;
+  avgRowsWithColorChangesPerFrame: number;
+}
+
+export interface RuneRuntimeHints {
+  changedRowsByFrame?: number[][];
 }
 
 export interface RuneMeta {
@@ -21,10 +36,12 @@ export interface RuneMeta {
   frameCount: number;
   colored: boolean;
   generatedWith: RuneGenerationSettings;
+  performance?: RunePerformanceStats;
 }
 
 export interface RuneAnimation {
   version: 1;
   meta: RuneMeta;
   frames: RuneFrame[];
+  runtimeHints?: RuneRuntimeHints;
 }

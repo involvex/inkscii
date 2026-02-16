@@ -23,4 +23,4 @@
 
 - All page components are defined inline in `app/page.tsx` (Navbar, DetailToggle, AnimationCard)
 - Monospace font (Geist Mono) is critical — the entire site depends on it for ASCII rendering
-- Three detail levels for animations: small (50 cols), medium (90 cols), large (160 cols)
+- Three detail levels for animations: small (50 cols), medium (90 cols), large (170 cols)

@@ -50,6 +50,10 @@ export async function extractFrames(
 export async function getPixelData(framePath: string): Promise<string> {
   // Frames are already scaled with font-ratio correction by extractFrames,
   // so just read the pixel data directly — no extra resize needed.
-  const { stdout: pixelText } = await exec("magick", [framePath, "txt:-"]);
+  const { stdout: pixelText } = await exec(
+    "magick",
+    [framePath, "txt:-"],
+    { maxBuffer: 64 * 1024 * 1024 },
+  );
   return pixelText;
 }

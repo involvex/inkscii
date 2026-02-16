@@ -3,6 +3,7 @@ export interface ConvertOptions {
   thresholdHigh: number;
   chars: string;
   colored: boolean;
+  colorStep: number;
 }
 
 interface Pixel {
@@ -15,6 +16,14 @@ interface Pixel {
 
 function luminance(r: number, g: number, b: number): number {
   return Math.floor(0.2126 * r + 0.7152 * g + 0.0722 * b);
+}
+
+function quantizeChannel(value: number, step: number): number {
+  if (step <= 1) return value;
+  const quantized = Math.round(value / step) * step;
+  if (quantized < 0) return 0;
+  if (quantized > 255) return 255;
+  return quantized;
 }
 
 function parsePixelData(text: string): Pixel[] {
@@ -117,7 +126,7 @@ export function convertPixelsToAscii(
   if (pixels.length === 0) return [];
 
   const bg = detectBackground(pixels);
-  const { thresholdLow, thresholdHigh, chars, colored } = options;
+  const { thresholdLow, thresholdHigh, chars, colored, colorStep } = options;
 
   const bgMask = buildBackgroundMask(pixels, bg, thresholdLow, thresholdHigh);
 
@@ -166,9 +175,14 @@ export function convertPixelsToAscii(
       }
       idx = Math.max(1, Math.min(numChars - 1, idx));
       char = chars[idx];
-      color = colored
-        ? `${p.r.toString(16).padStart(2, "0")}${p.g.toString(16).padStart(2, "0")}${p.b.toString(16).padStart(2, "0")}`
-        : "";
+      if (!colored) {
+        color = "";
+      } else {
+        const r = quantizeChannel(p.r, colorStep);
+        const g = quantizeChannel(p.g, colorStep);
+        const b = quantizeChannel(p.b, colorStep);
+        color = `${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+      }
     }
 
     let row = rowMap.get(p.row);

@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState, type CSSProperties } from "react";
 import { useIsomorphicLayoutEffect } from "../hooks/useIsomorphicLayoutEffect";
 import { useIntersectionObserver } from "../hooks/useIntersectionObserver";
-import { parseFrames } from "../core/parser";
-import { RuneRenderer } from "../core/renderer";
+import { parseFrames, parseColoredFrameSet } from "../core/parser";
+import { RuneRenderer, type RenderMode } from "../core/renderer";
 import { getAnimationUrl, type RuneSize } from "../core/cdn";
 import type { RuneAnimation } from "../core/types";
 
@@ -12,6 +12,7 @@ export interface RuneProps {
   data?: RuneAnimation;
   src?: string;
   fps?: number;
+  renderMode?: RenderMode;
   playing?: boolean;
   loop?: boolean;
   colorOverlay?: string;
@@ -46,6 +47,7 @@ export function Rune({
   data,
   src,
   fps,
+  renderMode = "auto",
   playing = true,
   loop = true,
   colorOverlay,
@@ -55,7 +57,9 @@ export function Rune({
   onComplete,
   onError,
 }: RuneProps) {
-  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
+    "idle",
+  );
   const displayRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<RuneRenderer | null>(null);
@@ -66,26 +70,30 @@ export function Rune({
     (animData: RuneAnimation) => {
       animationDataRef.current = animData;
       const effectiveFps = fps ?? animData.meta.fps;
-      const frames = parseFrames(animData);
 
       const renderer = new RuneRenderer({
         fps: effectiveFps,
         loop,
         colored: animData.meta.colored,
+        renderMode,
+        columns: animData.meta.columns,
+        rows: animData.meta.rows,
+        avgSegmentsPerFrame: animData.meta.performance?.avgSegmentsPerFrame,
         onFrame,
         onComplete,
       });
-      renderer.setFrames(frames);
-      rendererRef.current = renderer;
 
-      if (displayRef.current) {
-        renderer.attach(displayRef.current);
-        renderer.renderCurrentFrame();
+      if (animData.meta.colored) {
+        const parsed = parseColoredFrameSet(animData);
+        renderer.setColoredFrames(parsed.frames, parsed.changedRowsByFrame);
+      } else {
+        renderer.setFrames(parseFrames(animData));
       }
 
+      rendererRef.current = renderer;
       setStatus("ready");
     },
-    [fps, loop, onFrame, onComplete],
+    [fps, loop, onFrame, onComplete, renderMode],
   );
 
   const resolveUrl = useCallback((): string | null => {
@@ -176,10 +184,11 @@ export function Rune({
     renderer.updateOptions({
       fps: fps ?? animationDataRef.current?.meta.fps ?? 30,
       loop,
+      renderMode,
       onFrame,
       onComplete,
     });
-  }, [fps, loop, onFrame, onComplete]);
+  }, [fps, loop, onFrame, onComplete, renderMode]);
 
   useIsomorphicLayoutEffect(() => {
     const renderer = rendererRef.current;
@@ -197,9 +206,7 @@ export function Rune({
       className={className}
       style={{ ...containerStyle, ...style }}
     >
-      {status === "loading" && (
-        <div style={{ color: "#666" }}>Loading...</div>
-      )}
+      {status === "loading" && <div style={{ color: "#666" }}>Loading...</div>}
       <div style={{ position: "relative" }}>
         <div ref={displayRef} />
         {colorOverlay && <div style={overlayStyle(colorOverlay)} />}
