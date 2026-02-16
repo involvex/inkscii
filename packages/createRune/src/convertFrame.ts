@@ -4,6 +4,7 @@ export interface ConvertOptions {
   chars: string;
   colored: boolean;
   colorStep: number;
+  maskHysteresis: number;
 }
 
 interface Pixel {
@@ -12,6 +13,19 @@ interface Pixel {
   r: number;
   g: number;
   b: number;
+}
+
+interface MaskState {
+  mask: Uint8Array;
+  rows: number;
+  cols: number;
+  bg: "light" | "dark";
+}
+
+let previousMaskState: MaskState | null = null;
+
+export function resetMaskStabilizer(): void {
+  previousMaskState = null;
 }
 
 function luminance(r: number, g: number, b: number): number {
@@ -86,7 +100,8 @@ function buildBackgroundMask(
   bg: "light" | "dark",
   thresholdLow: number,
   thresholdHigh: number,
-): Uint8Array {
+  maskHysteresis: number,
+): { mask: Uint8Array; rows: number; cols: number } {
   let maxRow = 0;
   let maxCol = 0;
   for (const p of pixels) {
@@ -104,8 +119,6 @@ function buildBackgroundMask(
   const isCandidate = (lum: number): boolean =>
     bg === "dark" ? lum < thresholdLow : lum > thresholdHigh;
 
-  // Pure per-pixel: only actual non-background pixels are content.
-  // No gap filling -- cleanest possible background separation.
   const mask = new Uint8Array(rows * cols).fill(1);
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -115,7 +128,30 @@ function buildBackgroundMask(
     }
   }
 
-  return mask;
+  // Hysteresis stabilizes near-threshold pixels on light-background footage.
+  // It prevents tiny luminance jitter from flipping white details in/out.
+  if (
+    bg === "light" &&
+    maskHysteresis > 0 &&
+    previousMaskState &&
+    previousMaskState.bg === bg &&
+    previousMaskState.rows === rows &&
+    previousMaskState.cols === cols
+  ) {
+    const exitBg = Math.max(0, thresholdHigh - maskHysteresis);
+    const enterBg = Math.min(255, thresholdHigh + maskHysteresis);
+    const previousMask = previousMaskState.mask;
+    for (let i = 0; i < mask.length; i++) {
+      const lum = lumGrid[i];
+      if (previousMask[i] === 1) {
+        mask[i] = lum >= exitBg ? 1 : 0;
+      } else {
+        mask[i] = lum > enterBg ? 1 : 0;
+      }
+    }
+  }
+
+  return { mask, rows, cols };
 }
 
 export function convertPixelsToAscii(
@@ -126,15 +162,26 @@ export function convertPixelsToAscii(
   if (pixels.length === 0) return [];
 
   const bg = detectBackground(pixels);
-  const { thresholdLow, thresholdHigh, chars, colored, colorStep } = options;
+  const {
+    thresholdLow,
+    thresholdHigh,
+    chars,
+    colored,
+    colorStep,
+    maskHysteresis,
+  } = options;
 
-  const bgMask = buildBackgroundMask(pixels, bg, thresholdLow, thresholdHigh);
-
-  let maxCol = 0;
-  for (const p of pixels) {
-    if (p.col > maxCol) maxCol = p.col;
-  }
-  const cols = maxCol + 1;
+  const {
+    mask: bgMask,
+    rows,
+    cols,
+  } = buildBackgroundMask(
+    pixels,
+    bg,
+    thresholdLow,
+    thresholdHigh,
+    maskHysteresis,
+  );
 
   let contentMax = 0;
   let contentMin = 255;
@@ -195,8 +242,17 @@ export function convertPixelsToAscii(
   }
 
   const sortedRows = [...rowMap.keys()].sort((a, b) => a - b);
-  return sortedRows.map((key) => {
-    const row = rowMap.get(key)!;
-    return [row.text, row.colors];
-  });
+  const frame: [string, string[]][] = sortedRows.map(
+    (key): [string, string[]] => {
+      const row = rowMap.get(key)!;
+      return [row.text, row.colors];
+    },
+  );
+  previousMaskState = {
+    mask: new Uint8Array(bgMask),
+    rows,
+    cols,
+    bg,
+  };
+  return frame;
 }

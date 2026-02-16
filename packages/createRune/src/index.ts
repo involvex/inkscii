@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { checkDeps } from "./checkDeps.js";
 import { extractFrames, getPixelData } from "./extractFrames.js";
-import { convertPixelsToAscii } from "./convertFrame.js";
+import { convertPixelsToAscii, resetMaskStabilizer } from "./convertFrame.js";
 import { bundleAnimation } from "./bundle.js";
 import { resolveOutputPath, printUsage } from "./output.js";
 
@@ -87,6 +87,11 @@ program
     "Suppress tiny frame-to-frame color flicker (0 disables)",
     "0",
   )
+  .option(
+    "--maskHysteresis <number>",
+    "Stabilize near-threshold mask classification (0 disables)",
+    "5",
+  )
   .option("--no-colored", "Disable per-character color")
   .option("--output <path>", "Output directory (default: auto-detect public/)")
   .action(async (videoArg: string, opts: Record<string, string | boolean>) => {
@@ -110,6 +115,7 @@ program
     const fontRatio = parseFloat(opts.fontRatio as string);
     const colorStep = parseInt(opts.colorStep as string, 10);
     const temporalHold = parseInt(opts.temporalHold as string, 10);
+    const maskHysteresis = parseInt(opts.maskHysteresis as string, 10);
     const colored = opts.colored !== false;
 
     if (!Number.isFinite(colorStep) || colorStep < 1 || colorStep > 255) {
@@ -119,6 +125,10 @@ program
 
     if (!Number.isFinite(temporalHold) || temporalHold < 0 || temporalHold > 765) {
       console.error("Error: --temporalHold must be an integer between 0 and 765");
+      process.exit(1);
+    }
+    if (!Number.isFinite(maskHysteresis) || maskHysteresis < 0 || maskHysteresis > 64) {
+      console.error("Error: --maskHysteresis must be an integer between 0 and 64");
       process.exit(1);
     }
 
@@ -136,6 +146,7 @@ program
     console.log(`Processing ${framePaths.length} frames into ASCII...`);
 
     const allFrames: [string, string[]][][] = [];
+    resetMaskStabilizer();
 
     for (let i = 0; i < framePaths.length; i++) {
       const pixelText = await getPixelData(framePaths[i]);
@@ -145,6 +156,7 @@ program
         chars,
         colored,
         colorStep,
+        maskHysteresis,
       });
       const previousFrame = allFrames.at(-1);
       const stableFrame = previousFrame
@@ -168,6 +180,7 @@ program
       fontRatio,
       colorStep,
       temporalHold,
+      maskHysteresis,
     });
 
     const finalPath = resolveOutputPath(

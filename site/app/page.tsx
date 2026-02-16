@@ -74,7 +74,7 @@ const animations: AnimationEntry[] = [
 
 type Size = "s" | "m" | "l";
 
-const COLUMNS: Record<Size, number> = { s: 50, m: 90, l: 170 };
+const COLUMNS: Record<Size, number> = { s: 50, m: 90, l: 160 };
 const SIZE_LABELS: Record<Size, string> = { s: "Low", m: "Med", l: "High" };
 
 /** Monospace char width is roughly 0.6 × font-size. */
@@ -108,60 +108,6 @@ function useFitFontSize(columns: number, padding: number = 24) {
   }, [columns, padding]);
 
   return { ref, fontSize };
-}
-
-function usePlaybackStats(sampleKey: string) {
-  const [fps, setFps] = useState<number>(0);
-  const [dropPct, setDropPct] = useState<number>(0);
-  const sampleRef = useRef({
-    startedAt: 0,
-    rendered: 0,
-    dropped: 0,
-    lastIndex: -1,
-  });
-
-  useEffect(() => {
-    sampleRef.current = {
-      startedAt: 0,
-      rendered: 0,
-      dropped: 0,
-      lastIndex: -1,
-    };
-    setFps(0);
-    setDropPct(0);
-  }, [sampleKey]);
-
-  const onFrame = useCallback((index: number) => {
-    const now = performance.now();
-    const sample = sampleRef.current;
-    if (sample.startedAt === 0) {
-      sample.startedAt = now;
-      sample.lastIndex = index;
-      return;
-    }
-
-    sample.rendered += 1;
-    if (sample.lastIndex !== -1) {
-      const jump = index > sample.lastIndex ? index - sample.lastIndex : 1;
-      if (jump > 1) sample.dropped += jump - 1;
-    }
-    sample.lastIndex = index;
-
-    const elapsed = now - sample.startedAt;
-    if (elapsed < 1000) return;
-
-    const measuredFps = (sample.rendered * 1000) / elapsed;
-    const totalSteps = sample.rendered + sample.dropped;
-    const measuredDropPct =
-      totalSteps > 0 ? (sample.dropped * 100) / totalSteps : 0;
-    setFps(Math.round(measuredFps));
-    setDropPct(Math.round(measuredDropPct));
-    sample.startedAt = now;
-    sample.rendered = 0;
-    sample.dropped = 0;
-  }, []);
-
-  return { fps, dropPct, onFrame };
 }
 
 function ThemeToggle({
@@ -294,9 +240,6 @@ function AnimationCard({
 }) {
   const [size, setSize] = useState<Size>("m");
   const { ref: bodyRef, fontSize } = useFitFontSize(COLUMNS[size]);
-  const { fps, dropPct, onFrame } = usePlaybackStats(`${name}-${size}`);
-  const targetFps = 30;
-  const isHealthy = fps >= 24 && dropPct <= 20;
 
   return (
     <div
@@ -332,25 +275,6 @@ function AnimationCard({
               fontFamily: "monospace",
               fontSize: 10,
               color: "var(--muted)",
-            }}
-          >
-            {fps > 0 ? `${fps}/${targetFps} fps` : `--/${targetFps} fps`} /{" "}
-            {dropPct}% drop
-          </span>
-          <span
-            style={{
-              fontFamily: "monospace",
-              fontSize: 10,
-              color: isHealthy ? "var(--accent)" : "#d66",
-            }}
-          >
-            {fps === 0 ? "warming" : isHealthy ? "smooth" : "degraded"}
-          </span>
-          <span
-            style={{
-              fontFamily: "monospace",
-              fontSize: 10,
-              color: "var(--muted)",
               opacity: 0.5,
             }}
           >
@@ -373,7 +297,6 @@ function AnimationCard({
             src={getSrc(name, size)}
             colorOverlay={colorOverlay}
             renderMode="auto"
-            onFrame={onFrame}
             style={{ fontSize }}
           />
         )}

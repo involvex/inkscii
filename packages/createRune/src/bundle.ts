@@ -12,6 +12,7 @@ interface BundleOptions {
   fontRatio: number;
   colorStep: number;
   temporalHold: number;
+  maskHysteresis: number;
 }
 
 interface BundlePerfStats {
@@ -179,6 +180,7 @@ export function bundleAnimation(
         fontRatio: options.fontRatio,
         colorStep: options.colorStep,
         temporalHold: options.temporalHold,
+        maskHysteresis: options.maskHysteresis,
       },
       performance: perf,
     },
