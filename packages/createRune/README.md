@@ -79,7 +79,7 @@ Video file (.mp4, .mov, .mkv, .avi, .webm)
   → All frames are bundled into a single .rune.json file
 ```
 
-The character mapping uses a ramp like `" .~-_=+*%#0oOxX@$"` — spaces for the brightest areas, dense characters for the darkest. A font ratio (default `0.6`) compensates for the fact that monospace characters are taller than they are wide — the ratio should match `charWidth / lineHeight` of the rendering font (0.6 is correct for web rendering with `lineHeight: 1`).
+The character mapping uses a ramp like `" -=+*%#0oOxX@$"` — spaces for background areas, dense characters for the darkest content. The converter uses border-connected flood fill to distinguish true background from enclosed white details, and temporal carry-forward to prevent flicker during motion. A font ratio (default `0.6`) compensates for the fact that monospace characters are taller than they are wide.
 
 ## The `.rune.json` format
 
@@ -97,8 +97,8 @@ Every animation is a single JSON file containing all frames:
     "colored": true,
     "generatedWith": {
       "thresholdLow": 5,
-      "thresholdHigh": 235,
-      "chars": " .~-_=+*%#0oOxX@$",
+      "thresholdHigh": 224,
+      "chars": " -=+*%#0oOxX@$",
       "fontRatio": 0.6
     }
   },

@@ -1,6 +1,6 @@
 {
   "name": "@rune-ascii/cli",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "CLI for generating ASCII art animations from video",
   "type": "module",
   "main": "./dist/index.js",

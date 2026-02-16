@@ -51,7 +51,7 @@ Video file (.mp4, .mov, .mkv, .avi, .webm)
   → All frames are bundled into a single .rune.json file
 ```
 
-The character mapping uses a ramp like `" .~-_=+*%#0oOxX@$"`, and spaces for the brightest areas, dense characters for the darkest. A font ratio (default `0.6`) compensates for the fact that monospace characters are taller than they are wide — the ratio should match `charWidth / lineHeight` of the rendering font (0.6 is correct for web rendering with `lineHeight: 1`).
+The character mapping uses a ramp like `" -=+*%#0oOxX@$"` — spaces for background areas, dense characters for the darkest content. The converter uses border-connected flood fill to distinguish true background from enclosed white details (like eyes), and temporal carry-forward to prevent background flicker during motion. A font ratio (default `0.6`) compensates for the fact that monospace characters are taller than they are wide — the ratio should match `charWidth / lineHeight` of the rendering font (0.6 is correct for web rendering with `lineHeight: 1`).
 
 **Requirements:** ffmpeg and ImageMagick must be installed on your system. The CLI checks for them on startup and tells you how to install them if they're missing.
 
@@ -138,26 +138,24 @@ npx @rune-ascii/cli generate ./video.mp4
 
 ### Options
 
-| Flag               | Default               | Description                    |
-| ------------------ | --------------------- | ------------------------------ |
-| `--name`           | filename              | Animation name                 |
-| `--fps`            | `30`                  | Frames per second              |
-| `--columns`        | `90`                  | Width in characters            |
-| `--threshold-low`  | `5`                   | Luminance floor (0–255)        |
-| `--threshold-high` | `235`                 | Luminance ceiling (0–255)      |
-| `--chars`          | `" .~-_=+*%#0oOxX@$"` | Character ramp (light to dark) |
-| `--font-ratio`     | `0.6`                 | Character aspect ratio (charWidth/lineHeight) |
-| `--no-colored`     | —                     | Disable per-character color    |
-| `--output`         | current dir           | Output directory               |
+| Flag               | Default              | Description                    |
+| ------------------ | -------------------- | ------------------------------ |
+| `--name`           | filename             | Animation name                 |
+| `--fps`            | `30`                 | Frames per second              |
+| `--columns`        | `150`                | Width in characters            |
+| `--threshold-low`  | `5`                  | Luminance floor (0–255)        |
+| `--threshold-high` | `224`                | Luminance ceiling (0–255)      |
+| `--chars`          | `" -=+*%#0oOxX@$"`  | Character ramp (light to dark) |
+| `--font-ratio`     | `0.6`                | Character aspect ratio         |
+| `--mask-hysteresis` | `6`                 | Stabilize mask between frames  |
+| `--no-colored`     | —                    | Disable per-character color    |
+| `--output`         | current dir          | Output directory               |
 
 ### Full example
 
 ```bash
-npx @rune-ascii/cli generate ./wave.mov \
+npx @rune-ascii/cli ./wave.mov \
   --name wave \
-  --fps 30 \
-  --columns 120 \
-  --colored \
   --output ./public/animations
 ```
 
@@ -177,8 +175,8 @@ Every animation is a single JSON file containing all frames:
     "colored": true,
     "generatedWith": {
       "thresholdLow": 5,
-      "thresholdHigh": 235,
-      "chars": " .~-_=+*%#0oOxX@$",
+      "thresholdHigh": 224,
+      "chars": " -=+*%#0oOxX@$",
       "fontRatio": 0.6
     }
   },
@@ -259,7 +257,7 @@ Pre-generated `.rune.json` files published to npm. Users never install this dire
 The `rune-ascii` package you install is only 20 KB because it contains zero animation data. Animation files live in the separate `@rune-ascii/animations` npm package, which jsDelivr mirrors automatically. When you render `<Rune name="ghost" />`, the component constructs a URL like:
 
 ```
-https://cdn.jsdelivr.net/npm/@rune-ascii/animations@0.1.4/ghost.rune.json
+https://cdn.jsdelivr.net/npm/@rune-ascii/animations@0.2.0/ghost.rune.json
 ```
 
 …and fetches just that one animation. The browser caches it. You only download the animations you actually use.
