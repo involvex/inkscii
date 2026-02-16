@@ -53,9 +53,7 @@ function parsePixelData(text: string): Pixel[] {
   return pixels;
 }
 
-function detectBackground(
-  pixels: Pixel[],
-): "light" | "dark" {
+function detectBackground(pixels: Pixel[]): "light" | "dark" {
   const sample = pixels.filter((p) => p.row === 0).slice(0, 10);
   if (sample.length === 0) return "dark";
 
@@ -65,6 +63,50 @@ function detectBackground(
   }
 
   return total / sample.length > 200 ? "light" : "dark";
+}
+
+/**
+ * Per-row gap-aware background detection. For each row, content pixels are
+ * always kept. Runs of background-candidate pixels between two content
+ * pixels are filled as content only if the run is short (an interior detail
+ * like the robot's eyes). Long runs (like the gap between the lamp and
+ * the head) stay as background.
+ */
+function buildBackgroundMask(
+  pixels: Pixel[],
+  bg: "light" | "dark",
+  thresholdLow: number,
+  thresholdHigh: number,
+): Uint8Array {
+  let maxRow = 0;
+  let maxCol = 0;
+  for (const p of pixels) {
+    if (p.row > maxRow) maxRow = p.row;
+    if (p.col > maxCol) maxCol = p.col;
+  }
+  const rows = maxRow + 1;
+  const cols = maxCol + 1;
+
+  const lumGrid = new Uint8Array(rows * cols);
+  for (const p of pixels) {
+    lumGrid[p.row * cols + p.col] = luminance(p.r, p.g, p.b);
+  }
+
+  const isCandidate = (lum: number): boolean =>
+    bg === "dark" ? lum < thresholdLow : lum > thresholdHigh;
+
+  // Pure per-pixel: only actual non-background pixels are content.
+  // No gap filling -- cleanest possible background separation.
+  const mask = new Uint8Array(rows * cols).fill(1);
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (!isCandidate(lumGrid[r * cols + c])) {
+        mask[r * cols + c] = 0;
+      }
+    }
+  }
+
+  return mask;
 }
 
 export function convertPixelsToAscii(
@@ -77,17 +119,29 @@ export function convertPixelsToAscii(
   const bg = detectBackground(pixels);
   const { thresholdLow, thresholdHigh, chars, colored } = options;
 
+  const bgMask = buildBackgroundMask(pixels, bg, thresholdLow, thresholdHigh);
+
+  let maxCol = 0;
+  for (const p of pixels) {
+    if (p.col > maxCol) maxCol = p.col;
+  }
+  const cols = maxCol + 1;
+
   let contentMax = 0;
+  let contentMin = 255;
   for (const p of pixels) {
     const lum = luminance(p.r, p.g, p.b);
-    const isBg =
-      bg === "dark" ? lum < thresholdLow : lum > thresholdHigh;
-    if (!isBg && lum > contentMax) contentMax = lum;
+    const isBg = bgMask[p.row * cols + p.col] === 1;
+    if (!isBg) {
+      if (lum > contentMax) contentMax = lum;
+      if (lum < contentMin) contentMin = lum;
+    }
   }
   if (contentMax === 0) contentMax = 255;
+  if (contentMin === 255) contentMin = 0;
 
-  const lumFloor = bg === "light" ? 0 : thresholdLow;
-  const lumCeil = bg === "light" ? thresholdHigh : contentMax;
+  const lumFloor = contentMin;
+  const lumCeil = contentMax;
   const lumRange = Math.max(lumCeil - lumFloor, 1);
   const numChars = chars.length;
 
@@ -95,8 +149,7 @@ export function convertPixelsToAscii(
 
   for (const p of pixels) {
     const lum = luminance(p.r, p.g, p.b);
-    const isBg =
-      bg === "dark" ? lum < thresholdLow : lum > thresholdHigh;
+    const isBg = bgMask[p.row * cols + p.col] === 1;
 
     let char: string;
     let color: string;
@@ -105,8 +158,13 @@ export function convertPixelsToAscii(
       char = " ";
       color = "";
     } else {
-      let idx = Math.floor(((lum - lumFloor) * (numChars - 1)) / lumRange);
-      idx = Math.max(0, Math.min(numChars - 1, idx));
+      let idx: number;
+      if (bg === "light") {
+        idx = Math.floor(((lumCeil - lum) * (numChars - 1)) / lumRange);
+      } else {
+        idx = Math.floor(((lum - lumFloor) * (numChars - 1)) / lumRange);
+      }
+      idx = Math.max(1, Math.min(numChars - 1, idx));
       char = chars[idx];
       color = colored
         ? `${p.r.toString(16).padStart(2, "0")}${p.g.toString(16).padStart(2, "0")}${p.b.toString(16).padStart(2, "0")}`

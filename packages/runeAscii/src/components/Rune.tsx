@@ -19,6 +19,7 @@ export interface RuneProps {
   style?: CSSProperties;
   onFrame?: (index: number) => void;
   onComplete?: () => void;
+  onError?: (error: Error) => void;
 }
 
 const containerStyle: CSSProperties = {
@@ -52,8 +53,9 @@ export function Rune({
   style,
   onFrame,
   onComplete,
+  onError,
 }: RuneProps) {
-  const [status, setStatus] = useState<"idle" | "loading" | "ready">("idle");
+  const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const displayRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<RuneRenderer | null>(null);
@@ -104,11 +106,19 @@ export function Rune({
     const url = resolveUrl();
     if (url) {
       setStatus("loading");
-      const response = await fetch(url);
-      const animData: RuneAnimation = await response.json();
-      initRenderer(animData);
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`Failed to load animation: ${response.status}`);
+        }
+        const animData: RuneAnimation = await response.json();
+        initRenderer(animData);
+      } catch (err) {
+        setStatus("error");
+        onError?.(err instanceof Error ? err : new Error(String(err)));
+      }
     }
-  }, [data, resolveUrl, initRenderer]);
+  }, [data, resolveUrl, initRenderer, onError]);
 
   useIntersectionObserver(containerRef, load, { rootMargin: "400px" });
 
@@ -187,7 +197,7 @@ export function Rune({
       className={className}
       style={{ ...containerStyle, ...style }}
     >
-      {status !== "ready" && status === "loading" && (
+      {status === "loading" && (
         <div style={{ color: "#666" }}>Loading...</div>
       )}
       <div style={{ position: "relative" }}>

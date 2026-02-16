@@ -347,7 +347,6 @@ export default function Home() {
             npm install rune-ascii
           </div>
         </div>
-
         <div
           style={{
             display: "flex",

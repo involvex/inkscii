@@ -22,7 +22,7 @@ program
   .option("--columns <number>", "Width in characters", "90")
   .option("--thresholdLow <number>", "Dark background cutoff", "5")
   .option("--thresholdHigh <number>", "Light background cutoff", "235")
-  .option("--chars <string>", "Character ramp", " .~-_=+*%#0oOxX@$")
+  .option("--chars <string>", "Character ramp", " -=+*%#0oOxX@$")
   .option(
     "--fontRatio <number>",
     "Character aspect ratio (charWidth/lineHeight)",

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-// import Script from "next/script";
+import Script from "next/script";
 import { Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -21,6 +21,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <Script
+          src="https://unpkg.com/react-scan/dist/auto.global.js"
+          strategy="beforeInteractive"
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem("rune-theme");if(t==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})();`,

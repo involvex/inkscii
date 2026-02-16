@@ -14,19 +14,21 @@ export function resolveOutputPath(
   name: string,
   outputFlag: string | undefined,
 ): string {
+  const filename = `${name}.rune.json`;
+
   if (outputFlag) {
     mkdirSync(outputFlag, { recursive: true });
-    return join(outputFlag, `${name}.rune.json`);
+    return join(outputFlag, filename);
   }
 
   const publicDir = detectPublicDir();
   if (publicDir) {
     const animDir = join(publicDir, "animations");
     mkdirSync(animDir, { recursive: true });
-    return join(animDir, `${name}.rune.json`);
+    return join(animDir, filename);
   }
 
-  return join(process.cwd(), `${name}.rune.json`);
+  return join(process.cwd(), filename);
 }
 
 export function moveToOutput(tempPath: string, finalPath: string) {
