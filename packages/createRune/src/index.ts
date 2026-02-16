@@ -23,7 +23,11 @@ program
   .option("--thresholdLow <number>", "Dark background cutoff", "5")
   .option("--thresholdHigh <number>", "Light background cutoff", "235")
   .option("--chars <string>", "Character ramp", " .~-_=+*%#0oOxX@$")
-  .option("--fontRatio <number>", "Character aspect ratio", "0.44")
+  .option(
+    "--fontRatio <number>",
+    "Character aspect ratio (charWidth/lineHeight)",
+    "0.6",
+  )
   .option("--no-colored", "Disable per-character color")
   .option("--output <path>", "Output directory (default: auto-detect public/)")
   .action(async (videoArg: string, opts: Record<string, string | boolean>) => {
@@ -63,7 +67,7 @@ program
     const allFrames: [string, string[]][][] = [];
 
     for (let i = 0; i < framePaths.length; i++) {
-      const pixelText = await getPixelData(framePaths[i], fontRatio);
+      const pixelText = await getPixelData(framePaths[i]);
       const asciiFrame = convertPixelsToAscii(pixelText, {
         thresholdLow,
         thresholdHigh,
@@ -77,11 +81,16 @@ program
     console.log(" Done");
 
     const tempOutput = join(tempDir, `${name}.rune.json`);
-    const { rows, cols, sizeMB } = bundleAnimation(
-      allFrames,
-      tempOutput,
-      { name, fps, columns, colored, thresholdLow, thresholdHigh, chars, fontRatio },
-    );
+    const { rows, cols, sizeMB } = bundleAnimation(allFrames, tempOutput, {
+      name,
+      fps,
+      columns,
+      colored,
+      thresholdLow,
+      thresholdHigh,
+      chars,
+      fontRatio,
+    });
 
     const finalPath = resolveOutputPath(
       name,

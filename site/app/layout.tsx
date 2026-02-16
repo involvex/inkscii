@@ -19,13 +19,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      {/* <head>
-        <Script
-          src="https://unpkg.com/react-scan/dist/auto.global.js"
-          strategy="beforeInteractive"
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("rune-theme");if(t==="light")document.documentElement.setAttribute("data-theme","light")}catch(e){}})();`,
+          }}
         />
-      </head> */}
+      </head>
       <body
         className={`${geistMono.variable} ${geistMono.className} antialiased`}
       >

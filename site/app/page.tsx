@@ -1,9 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Rune, setRuneCdn } from "rune-ascii";
 
 setRuneCdn("/animations");
+
+type Theme = "dark" | "light";
+
+function useTheme() {
+  const [theme, setThemeState] = useState<Theme>("dark");
+
+  useEffect(() => {
+    const stored = document.documentElement.getAttribute("data-theme");
+    if (stored === "light") setThemeState("light");
+  }, []);
+
+  const setTheme = useCallback((t: Theme) => {
+    setThemeState(t);
+    document.documentElement.setAttribute("data-theme", t);
+    localStorage.setItem("rune-theme", t);
+  }, []);
+
+  const toggle = useCallback(() => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  }, [theme, setTheme]);
+
+  return { theme, toggle };
+}
 
 interface AnimationEntry {
   name: string;
@@ -46,6 +69,7 @@ const animations: AnimationEntry[] = [
   { name: "glassStar" },
   { name: "gorilla" },
   { name: "donut" },
+  { name: "aitBot" },
 ];
 
 type Size = "s" | "m" | "l";
@@ -86,7 +110,44 @@ function useFitFontSize(columns: number, padding: number = 24) {
   return { ref, fontSize };
 }
 
-function Navbar() {
+function ThemeToggle({
+  theme,
+  onToggle,
+}: {
+  theme: Theme;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 32,
+        height: 32,
+        borderRadius: 6,
+        border: "1px solid var(--card-border)",
+        background: "var(--toggle-bg)",
+        color: "var(--toggle-fg)",
+        cursor: "pointer",
+        fontSize: 15,
+        transition: "background 0.2s, border-color 0.2s",
+      }}
+    >
+      {theme === "dark" ? "\u2600" : "\u263E"}
+    </button>
+  );
+}
+
+function Navbar({
+  theme,
+  onToggleTheme,
+}: {
+  theme: Theme;
+  onToggleTheme: () => void;
+}) {
   return (
     <nav
       style={{
@@ -99,7 +160,8 @@ function Navbar() {
         padding: "16px 32px",
         borderBottom: "1px solid var(--card-border)",
         backdropFilter: "blur(12px)",
-        backgroundColor: "rgba(0,0,0,0.85)",
+        backgroundColor: "var(--nav-bg)",
+        transition: "background-color 0.25s, border-color 0.25s",
       }}
     >
       <span
@@ -113,21 +175,24 @@ function Navbar() {
       >
         RUNE
       </span>
-      <a
-        href="https://github.com/zekejohn/rune"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="nav-link"
-        style={{
-          fontFamily: "monospace",
-          fontSize: 16,
-          color: "var(--fg)",
-          padding: "5px 12px",
-          transition: "color 0.15s",
-        }}
-      >
-        Github
-      </a>
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <a
+          href="https://github.com/zekejohn/rune"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="nav-link"
+          style={{
+            fontFamily: "monospace",
+            fontSize: 16,
+            color: "var(--fg)",
+            padding: "5px 12px",
+            transition: "color 0.15s",
+          }}
+        >
+          Github
+        </a>
+        <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+      </div>
     </nav>
   );
 }
@@ -240,9 +305,11 @@ function AnimationCard({
 }
 
 export default function Home() {
+  const { theme, toggle } = useTheme();
+
   return (
     <>
-      <Navbar />
+      <Navbar theme={theme} onToggleTheme={toggle} />
       <main
         style={{ maxWidth: 640, margin: "0 auto", padding: "32px 24px 96px" }}
       >

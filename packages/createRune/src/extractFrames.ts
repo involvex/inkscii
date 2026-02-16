@@ -23,13 +23,18 @@ export async function extractFrames(
     `Extracting frames at ${options.fps}fps, ${options.columns} columns...`,
   );
 
+  // Bake the font-ratio height correction into the scale filter so each
+  // frame already has the correct dimensions for terminal display.
+  // height = round_even( columns / input_aspect * fontRatio )
+  const scaleExpr = `scale=${options.columns}:trunc(ow/a*${options.fontRatio}/2)*2`;
+
   await exec("ffmpeg", [
     "-loglevel",
     "error",
     "-i",
     videoPath,
     "-vf",
-    `scale=${options.columns}:-2,fps=${options.fps}`,
+    `${scaleExpr},fps=${options.fps}`,
     join(framesDir, "frame_%04d.png"),
   ]);
 
@@ -42,33 +47,9 @@ export async function extractFrames(
   return pngFiles;
 }
 
-export async function getPixelData(
-  framePath: string,
-  fontRatio: number,
-): Promise<string> {
-  const { stdout: heightStr } = await exec("magick", [
-    "identify",
-    "-ping",
-    "-format",
-    "%h",
-    framePath,
-  ]);
-
-  const originalHeight = parseInt(heightStr.trim(), 10);
-  const newHeight = Math.round(fontRatio * originalHeight);
-
-  const squished = framePath.replace(".png", "_sq.png");
-  await exec("magick", [
-    framePath,
-    "-resize",
-    `x${newHeight}!`,
-    squished,
-  ]);
-
-  const { stdout: pixelText } = await exec("magick", [squished, "txt:-"]);
-
-  const { unlink } = await import("node:fs/promises");
-  await unlink(squished);
-
+export async function getPixelData(framePath: string): Promise<string> {
+  // Frames are already scaled with font-ratio correction by extractFrames,
+  // so just read the pixel data directly — no extra resize needed.
+  const { stdout: pixelText } = await exec("magick", [framePath, "txt:-"]);
   return pixelText;
 }
