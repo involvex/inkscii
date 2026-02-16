@@ -21,8 +21,12 @@ function colorDistance(hexA: string, hexB: string): number {
   const bg = parseInt(hexB.slice(2, 4), 16);
   const bb = parseInt(hexB.slice(4, 6), 16);
   if (
-    Number.isNaN(ar) || Number.isNaN(ag) || Number.isNaN(ab) ||
-    Number.isNaN(br) || Number.isNaN(bg) || Number.isNaN(bb)
+    Number.isNaN(ar) ||
+    Number.isNaN(ag) ||
+    Number.isNaN(ab) ||
+    Number.isNaN(br) ||
+    Number.isNaN(bg) ||
+    Number.isNaN(bb)
   ) {
     return 9999;
   }
@@ -36,7 +40,10 @@ function applyTemporalHold(
 ): AsciiFrame {
   if (holdThreshold <= 0) return currentFrame;
   const rows = Math.min(currentFrame.length, previousFrame.length);
-  const stabilized: AsciiFrame = currentFrame.map(([text, colors]) => [text, [...colors]]);
+  const stabilized: AsciiFrame = currentFrame.map(([text, colors]) => [
+    text,
+    [...colors],
+  ]);
   for (let row = 0; row < rows; row++) {
     const [currentText, currentColors] = stabilized[row];
     const [previousText, previousColors] = previousFrame[row];
@@ -68,9 +75,9 @@ program
   .argument("<video>", "Path to the video file")
   .option("--name <name>", "Animation name (default: video filename)")
   .option("--fps <number>", "Frames per second", "30")
-  .option("--columns <number>", "Width in characters", "90")
+  .option("--columns <number>", "Width in characters", "150")
   .option("--thresholdLow <number>", "Dark background cutoff", "5")
-  .option("--thresholdHigh <number>", "Light background cutoff", "235")
+  .option("--thresholdHigh <number>", "Light background cutoff", "224")
   .option("--chars <string>", "Character ramp", " -=+*%#0oOxX@$")
   .option(
     "--fontRatio <number>",
@@ -90,7 +97,7 @@ program
   .option(
     "--maskHysteresis <number>",
     "Stabilize near-threshold mask classification (0 disables)",
-    "5",
+    "6",
   )
   .option("--no-colored", "Disable per-character color")
   .option("--output <path>", "Output directory (default: auto-detect public/)")
@@ -123,12 +130,24 @@ program
       process.exit(1);
     }
 
-    if (!Number.isFinite(temporalHold) || temporalHold < 0 || temporalHold > 765) {
-      console.error("Error: --temporalHold must be an integer between 0 and 765");
+    if (
+      !Number.isFinite(temporalHold) ||
+      temporalHold < 0 ||
+      temporalHold > 765
+    ) {
+      console.error(
+        "Error: --temporalHold must be an integer between 0 and 765",
+      );
       process.exit(1);
     }
-    if (!Number.isFinite(maskHysteresis) || maskHysteresis < 0 || maskHysteresis > 64) {
-      console.error("Error: --maskHysteresis must be an integer between 0 and 64");
+    if (
+      !Number.isFinite(maskHysteresis) ||
+      maskHysteresis < 0 ||
+      maskHysteresis > 64
+    ) {
+      console.error(
+        "Error: --maskHysteresis must be an integer between 0 and 64",
+      );
       process.exit(1);
     }
 

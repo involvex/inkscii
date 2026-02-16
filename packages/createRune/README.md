@@ -49,10 +49,10 @@ npx @rune-ascii/cli generate <video-file> [options]
 | ------------------ | ---------------------- | ------------------------------ |
 | `--name`           | filename               | Animation name                 |
 | `--fps`            | `30`                   | Frames per second              |
-| `--columns`        | `90`                   | Width in characters            |
+| `--columns`        | `150`                  | Width in characters            |
 | `--threshold-low`  | `5`                    | Luminance floor (0–255)        |
-| `--threshold-high` | `235`                  | Luminance ceiling (0–255)      |
-| `--chars`          | `" .~-_=+*%#0oOxX@$"` | Character ramp (light to dark) |
+| `--threshold-high` | `224`                  | Luminance ceiling (0–255)      |
+| `--chars`          | `" -=+*%#0oOxX@$"`    | Character ramp (light to dark) |
 | `--font-ratio`     | `0.6`                  | Character aspect ratio (charWidth/lineHeight) |
 | `--no-colored`     | —                      | Disable per-character color    |
 | `--output`         | current dir            | Output directory               |
