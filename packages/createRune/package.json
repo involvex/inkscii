@@ -12,7 +12,8 @@
   ],
   "scripts": {
     "build": "tsup",
-    "dev": "tsup --watch"
+    "dev": "tsup --watch",
+    "test:mask": "tsc --module NodeNext --moduleResolution NodeNext --target ES2020 --outDir .tmp-test --rootDir src src/convertFrame.ts src/convertFrame.mask.test.ts && node --test .tmp-test/convertFrame.mask.test.js"
   },
   "dependencies": {
     "commander": "^14.0.3"

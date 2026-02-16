@@ -41,14 +41,8 @@ const animations: AnimationEntry[] = [
   },
   { name: "ghost" },
   { name: "flame" },
-  {
-    name: "warning",
-    colorOverlay:
-      "linear-gradient(135deg, rgba(200,0,0,0.8) 0%, rgba(255,30,30,1) 100%)",
-  },
   { name: "flowerSpinner" },
   { name: "coin" },
-  { name: "earth2" },
   { name: "earth1" },
   { name: "saturn" },
   { name: "orangutan" },
@@ -62,13 +56,7 @@ const animations: AnimationEntry[] = [
   { name: "tuxLaptop" },
   { name: "rocket" },
   { name: "sideFlames" },
-  { name: "cubes" },
-  { name: "dawg" },
-  { name: "ballsInAGlass" },
-  { name: "arrow1" },
   { name: "glassStar" },
-  { name: "gorilla" },
-  { name: "donut" },
   { name: "aitBot" },
 ];
 

@@ -16,7 +16,8 @@ interface Pixel {
 }
 
 interface MaskState {
-  mask: Uint8Array;
+  candidateMask: Uint8Array;
+  finalMask: Uint8Array;
   rows: number;
   cols: number;
   bg: "light" | "dark";
@@ -30,6 +31,17 @@ export function resetMaskStabilizer(): void {
 
 function luminance(r: number, g: number, b: number): number {
   return Math.floor(0.2126 * r + 0.7152 * g + 0.0722 * b);
+}
+
+function colorDistance(
+  r1: number,
+  g1: number,
+  b1: number,
+  r2: number,
+  g2: number,
+  b2: number,
+): number {
+  return Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2);
 }
 
 function quantizeChannel(value: number, step: number): number {
@@ -89,11 +101,56 @@ function detectBackground(pixels: Pixel[]): "light" | "dark" {
 }
 
 /**
- * Per-row gap-aware background detection. For each row, content pixels are
- * always kept. Runs of background-candidate pixels between two content
- * pixels are filled as content only if the run is short (an interior detail
- * like the robot's eyes). Long runs (like the gap between the lamp and
- * the head) stay as background.
+ * Flood-fills thresholded background candidates from the frame border.
+ * Only border-connected candidates are considered transparent background;
+ * enclosed candidate islands are kept as visible content.
+ */
+function computeBorderConnectedMask(
+  candidateMask: Uint8Array,
+  rows: number,
+  cols: number,
+): Uint8Array {
+  const mask = new Uint8Array(candidateMask.length);
+  const queue = new Uint32Array(candidateMask.length);
+  let head = 0;
+  let tail = 0;
+
+  const enqueue = (index: number): void => {
+    if (candidateMask[index] !== 1 || mask[index] === 1) return;
+    mask[index] = 1;
+    queue[tail++] = index;
+  };
+
+  for (let col = 0; col < cols; col++) {
+    enqueue(col);
+    enqueue((rows - 1) * cols + col);
+  }
+  for (let row = 0; row < rows; row++) {
+    enqueue(row * cols);
+    enqueue(row * cols + (cols - 1));
+  }
+
+  while (head < tail) {
+    const index = queue[head++];
+    const row = Math.floor(index / cols);
+    const col = index - row * cols;
+
+    if (row > 0) enqueue(index - cols);
+    if (row + 1 < rows) enqueue(index + cols);
+    if (col > 0) enqueue(index - 1);
+    if (col + 1 < cols) enqueue(index + 1);
+    if (row > 0 && col > 0) enqueue(index - cols - 1);
+    if (row > 0 && col + 1 < cols) enqueue(index - cols + 1);
+    if (row + 1 < rows && col > 0) enqueue(index + cols - 1);
+    if (row + 1 < rows && col + 1 < cols) enqueue(index + cols + 1);
+  }
+
+  return mask;
+}
+
+/**
+ * Builds a stable threshold-based candidate mask, then derives the final
+ * transparent background mask via border connectivity.
  */
 function buildBackgroundMask(
   pixels: Pixel[],
@@ -101,7 +158,12 @@ function buildBackgroundMask(
   thresholdLow: number,
   thresholdHigh: number,
   maskHysteresis: number,
-): { mask: Uint8Array; rows: number; cols: number } {
+): {
+  candidateMask: Uint8Array;
+  finalMask: Uint8Array;
+  rows: number;
+  cols: number;
+} {
   let maxRow = 0;
   let maxCol = 0;
   for (const p of pixels) {
@@ -112,18 +174,71 @@ function buildBackgroundMask(
   const cols = maxCol + 1;
 
   const lumGrid = new Uint8Array(rows * cols);
+  const rGrid = new Uint8Array(rows * cols);
+  const gGrid = new Uint8Array(rows * cols);
+  const bGrid = new Uint8Array(rows * cols);
   for (const p of pixels) {
-    lumGrid[p.row * cols + p.col] = luminance(p.r, p.g, p.b);
+    const index = p.row * cols + p.col;
+    lumGrid[index] = luminance(p.r, p.g, p.b);
+    rGrid[index] = p.r;
+    gGrid[index] = p.g;
+    bGrid[index] = p.b;
   }
 
-  const isCandidate = (lum: number): boolean =>
-    bg === "dark" ? lum < thresholdLow : lum > thresholdHigh;
+  let borderR = 0;
+  let borderG = 0;
+  let borderB = 0;
+  let borderCount = 0;
+  for (let col = 0; col < cols; col++) {
+    const topIdx = col;
+    const bottomIdx = (rows - 1) * cols + col;
+    borderR += rGrid[topIdx] + rGrid[bottomIdx];
+    borderG += gGrid[topIdx] + gGrid[bottomIdx];
+    borderB += bGrid[topIdx] + bGrid[bottomIdx];
+    borderCount += 2;
+  }
+  for (let row = 1; row < rows - 1; row++) {
+    const leftIdx = row * cols;
+    const rightIdx = row * cols + (cols - 1);
+    borderR += rGrid[leftIdx] + rGrid[rightIdx];
+    borderG += gGrid[leftIdx] + gGrid[rightIdx];
+    borderB += bGrid[leftIdx] + bGrid[rightIdx];
+    borderCount += 2;
+  }
+  const bgRefR = Math.round(borderR / Math.max(borderCount, 1));
+  const bgRefG = Math.round(borderG / Math.max(borderCount, 1));
+  const bgRefB = Math.round(borderB / Math.max(borderCount, 1));
+  const relaxedThreshold = Math.max(
+    0,
+    thresholdHigh - Math.max(12, maskHysteresis * 4),
+  );
+  const colorTolerance = 48;
+  const relaxedColorTolerance =
+    colorTolerance + Math.max(8, maskHysteresis * 3);
 
-  const mask = new Uint8Array(rows * cols).fill(1);
+  const candidateMask = new Uint8Array(rows * cols).fill(1);
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (!isCandidate(lumGrid[r * cols + c])) {
-        mask[r * cols + c] = 0;
+      const index = r * cols + c;
+      const lum = lumGrid[index];
+      let isBgCandidate: boolean;
+      if (bg === "dark") {
+        isBgCandidate = lum < thresholdLow;
+      } else {
+        const dist = colorDistance(
+          rGrid[index],
+          gGrid[index],
+          bGrid[index],
+          bgRefR,
+          bgRefG,
+          bgRefB,
+        );
+        isBgCandidate =
+          lum > thresholdHigh ||
+          (lum > relaxedThreshold && dist <= colorTolerance);
+      }
+      if (!isBgCandidate) {
+        candidateMask[index] = 0;
       }
     }
   }
@@ -138,20 +253,75 @@ function buildBackgroundMask(
     previousMaskState.rows === rows &&
     previousMaskState.cols === cols
   ) {
-    const exitBg = Math.max(0, thresholdHigh - maskHysteresis);
+    const previousMask = previousMaskState.candidateMask;
     const enterBg = Math.min(255, thresholdHigh + maskHysteresis);
-    const previousMask = previousMaskState.mask;
-    for (let i = 0; i < mask.length; i++) {
+    for (let i = 0; i < candidateMask.length; i++) {
       const lum = lumGrid[i];
+      const dist = colorDistance(
+        rGrid[i],
+        gGrid[i],
+        bGrid[i],
+        bgRefR,
+        bgRefG,
+        bgRefB,
+      );
       if (previousMask[i] === 1) {
-        mask[i] = lum >= exitBg ? 1 : 0;
+        candidateMask[i] =
+          lum >= relaxedThreshold && dist <= relaxedColorTolerance ? 1 : 0;
       } else {
-        mask[i] = lum > enterBg ? 1 : 0;
+        candidateMask[i] =
+          lum > enterBg || (lum > thresholdHigh && dist <= colorTolerance)
+            ? 1
+            : 0;
       }
     }
   }
 
-  return { mask, rows, cols };
+  const floodMask = computeBorderConnectedMask(candidateMask, rows, cols);
+
+  // Temporal carry-forward: if a candidate pixel was background in the
+  // previous frame's final mask (or adjacent to one), keep it as background
+  // even when the current flood fill can't reach it (e.g. the subject's arm
+  // temporarily closed a gap). The 1-pixel dilation catches thin strips of
+  // newly-exposed background at motion edges. True enclosed content like
+  // eyes is safe because it was NEVER background in any previous frame.
+  const finalMask = new Uint8Array(floodMask);
+  if (
+    previousMaskState &&
+    previousMaskState.bg === bg &&
+    previousMaskState.rows === rows &&
+    previousMaskState.cols === cols
+  ) {
+    const prevFinal = previousMaskState.finalMask;
+
+    // Dilate previous background by 1 pixel so edge strips are covered.
+    const dilated = new Uint8Array(prevFinal);
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (prevFinal[r * cols + c] === 1) continue;
+        let hasBgNeighbor = false;
+        for (let dr = -1; dr <= 1 && !hasBgNeighbor; dr++) {
+          for (let dc = -1; dc <= 1 && !hasBgNeighbor; dc++) {
+            if (dr === 0 && dc === 0) continue;
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr >= 0 && nr < rows && nc >= 0 && nc < cols) {
+              if (prevFinal[nr * cols + nc] === 1) hasBgNeighbor = true;
+            }
+          }
+        }
+        if (hasBgNeighbor) dilated[r * cols + c] = 1;
+      }
+    }
+
+    for (let i = 0; i < finalMask.length; i++) {
+      if (finalMask[i] === 0 && candidateMask[i] === 1 && dilated[i] === 1) {
+        finalMask[i] = 1;
+      }
+    }
+  }
+
+  return { candidateMask, finalMask, rows, cols };
 }
 
 export function convertPixelsToAscii(
@@ -172,7 +342,8 @@ export function convertPixelsToAscii(
   } = options;
 
   const {
-    mask: bgMask,
+    candidateMask,
+    finalMask: bgMask,
     rows,
     cols,
   } = buildBackgroundMask(
@@ -249,7 +420,8 @@ export function convertPixelsToAscii(
     },
   );
   previousMaskState = {
-    mask: new Uint8Array(bgMask),
+    candidateMask: new Uint8Array(candidateMask),
+    finalMask: new Uint8Array(bgMask),
     rows,
     cols,
     bg,
