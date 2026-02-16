@@ -44,14 +44,14 @@ Under the hood, this pipeline runs:
 
 ```
 Video file (.mp4, .mov, .mkv, .avi, .webm)
-  → ffmpeg extracts each frame as a PNG
-  → ImageMagick squishes frames vertically (text chars are taller than wide)
+  → ffmpeg extracts frames, scaling to target columns and applying
+    font-ratio height correction in a single pass
   → ImageMagick dumps every pixel's RGB values
   → Each pixel's luminance is mapped to an ASCII character
   → All frames are bundled into a single .rune.json file
 ```
 
-The character mapping uses a ramp like `" .~-_=+*%#0oOxX@$"`, and spaces for the brightest areas, dense characters for the darkest. A font ratio (0.44) compensates for the fact that monospace characters are roughly twice as tall as they are wide.
+The character mapping uses a ramp like `" .~-_=+*%#0oOxX@$"`, and spaces for the brightest areas, dense characters for the darkest. A font ratio (default `0.6`) compensates for the fact that monospace characters are taller than they are wide — the ratio should match `charWidth / lineHeight` of the rendering font (0.6 is correct for web rendering with `lineHeight: 1`).
 
 **Requirements:** ffmpeg and ImageMagick must be installed on your system. The CLI checks for them on startup and tells you how to install them if they're missing.
 
@@ -146,7 +146,7 @@ npx @rune-ascii/cli generate ./video.mp4
 | `--threshold-low`  | `5`                   | Luminance floor (0–255)        |
 | `--threshold-high` | `235`                 | Luminance ceiling (0–255)      |
 | `--chars`          | `" .~-_=+*%#0oOxX@$"` | Character ramp (light to dark) |
-| `--font-ratio`     | `0.44`                | Character aspect ratio         |
+| `--font-ratio`     | `0.6`                 | Character aspect ratio (charWidth/lineHeight) |
 | `--no-colored`     | —                     | Disable per-character color    |
 | `--output`         | current dir           | Output directory               |
 
@@ -179,7 +179,7 @@ Every animation is a single JSON file containing all frames:
       "thresholdLow": 5,
       "thresholdHigh": 235,
       "chars": " .~-_=+*%#0oOxX@$",
-      "fontRatio": 0.44
+      "fontRatio": 0.6
     }
   },
   "frames": [
@@ -218,8 +218,9 @@ These ship with `@rune-ascii/animations` and are available via CDN out of the bo
 | `sleepEmoji`    | Sleep emoji          |
 | `angryEmoji`    | Angry emoji          |
 | `geekedEmoji`   | Geeked emoji         |
+| `aitBot`        | AI robot             |
 
-Each animation is available in two sizes: `"m"` (90 columns, default) and `"s"` (45 columns).
+Each animation is available in two sizes: `"m"` (90 columns, default) and `"s"` (50 columns).
 
 ## Project structure
 
@@ -258,7 +259,7 @@ Pre-generated `.rune.json` files published to npm. Users never install this dire
 The `rune-ascii` package you install is only 20 KB because it contains zero animation data. Animation files live in the separate `@rune-ascii/animations` npm package, which jsDelivr mirrors automatically. When you render `<Rune name="ghost" />`, the component constructs a URL like:
 
 ```
-https://cdn.jsdelivr.net/npm/@rune-ascii/animations@0.1.3/ghost.rune.json
+https://cdn.jsdelivr.net/npm/@rune-ascii/animations@0.1.4/ghost.rune.json
 ```
 
 …and fetches just that one animation. The browser caches it. You only download the animations you actually use.
