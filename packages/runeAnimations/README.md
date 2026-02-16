@@ -17,7 +17,7 @@ import { Rune } from "rune-ascii";
 The `rune-ascii` component constructs a CDN URL like:
 
 ```
-https://cdn.jsdelivr.net/npm/@rune-ascii/animations@0.1.2/ghost.rune.json
+https://cdn.jsdelivr.net/npm/@rune-ascii/animations@0.1.4/ghost.rune.json
 ```
 
 ...and fetches just that one animation. The browser caches it. You only download the animations you actually use.
@@ -46,8 +46,9 @@ https://cdn.jsdelivr.net/npm/@rune-ascii/animations@0.1.2/ghost.rune.json
 | `sleepEmoji`    | Sleep emoji          |
 | `angryEmoji`    | Angry emoji          |
 | `geekedEmoji`   | Geeked emoji         |
+| `aitBot`        | AI robot             |
 
-Each animation is available in two sizes: `"m"` (90 columns, default) and `"s"` (45 columns).
+Each animation is available in two sizes: `"m"` (90 columns, default) and `"s"` (50 columns).
 
 ## Creating your own animations
 

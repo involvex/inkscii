@@ -115,8 +115,9 @@ These are available via CDN out of the box when using the `name` prop:
 | `sleepEmoji`    | Sleep emoji          |
 | `angryEmoji`    | Angry emoji          |
 | `geekedEmoji`   | Geeked emoji         |
+| `aitBot`        | AI robot             |
 
-Each animation is available in two sizes: `"m"` (90 columns, default) and `"s"` (45 columns).
+Each animation is available in two sizes: `"m"` (90 columns, default) and `"s"` (50 columns).
 
 ## Creating custom animations
 
