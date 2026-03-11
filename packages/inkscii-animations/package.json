@@ -1,0 +1,9 @@
+{
+  "name": "@inkscii/animations",
+  "version": "0.2.0",
+  "description": "Animation data for inkscii, served via CDN",
+  "files": [
+    "*.rune.json"
+  ],
+  "license": "MIT"
+}

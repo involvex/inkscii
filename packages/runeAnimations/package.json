@@ -1,9 +1,0 @@
-{
-  "name": "@rune-ascii/animations",
-  "version": "0.2.0",
-  "description": "Animation data for rune-ascii, served via CDN",
-  "files": [
-    "*.rune.json"
-  ],
-  "license": "MIT"
-}
