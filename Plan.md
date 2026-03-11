@@ -19,6 +19,7 @@
 ## Todo
 
 - [x] create a comprehensive monorepo setup, migrate tsup to bun run time for building , sync module types, fix dependencies / versions(update all)
-- [ ] create templates and example projects
-- [ ] document usage for each package
+- [x] create templates and example projects
+- [x] document usage for each package
+
 

@@ -10,7 +10,8 @@
     "url": "https://github.com/sponsors/involvex"
   },
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "examples/*"
   ],
   "scripts": {
     "build": "bun run build:cli && bun run build:ascii && bun run build:text",

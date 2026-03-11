@@ -1,4 +1,10 @@
-import { useCallback, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useRef,
+  useState,
+  useEffect,
+  type CSSProperties,
+} from "react";
 import { useIsomorphicLayoutEffect } from "../hooks/useIsomorphicLayoutEffect";
 import { useIntersectionObserver } from "../hooks/useIntersectionObserver";
 import { parseFrames, parseColoredFrameSet } from "../core/parser";
@@ -10,12 +16,14 @@ export interface RuneProps {
   name?: string;
   size?: RuneSize;
   data?: RuneAnimation;
+  animation?: RuneAnimation; // Alias for data
   src?: string;
   fps?: number;
   renderMode?: RenderMode;
   playing?: boolean;
   loop?: boolean;
   colorOverlay?: string;
+  colored?: boolean; // Toggle color output
   className?: string;
   style?: CSSProperties;
   onFrame?: (index: number) => void;
@@ -45,12 +53,14 @@ export function Rune({
   name,
   size = "m",
   data,
+  animation,
   src,
   fps,
   renderMode = "auto",
   playing = true,
   loop = true,
   colorOverlay,
+  colored = true,
   className,
   style,
   onFrame,
@@ -60,11 +70,17 @@ export function Rune({
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">(
     "idle",
   );
+  const [ansiFrame, setAnsiFrame] = useState("");
   const displayRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<RuneRenderer | null>(null);
   const animationDataRef = useRef<RuneAnimation | null>(null);
   const hasLoadedRef = useRef(false);
+
+  const effectiveData = data || animation;
+
+  const isBrowser = typeof window !== "undefined";
+  const effectiveRenderMode: RenderMode = !isBrowser ? "ansi" : renderMode;
 
   const initRenderer = useCallback(
     (animData: RuneAnimation) => {
@@ -74,12 +90,18 @@ export function Rune({
       const renderer = new RuneRenderer({
         fps: effectiveFps,
         loop,
-        colored: animData.meta.colored,
-        renderMode,
+        colored: colored && animData.meta.colored,
+        renderMode: effectiveRenderMode,
         columns: animData.meta.columns,
         rows: animData.meta.rows,
         avgSegmentsPerFrame: animData.meta.performance?.avgSegmentsPerFrame,
-        onFrame,
+        onFrame: (idx) => {
+          if (effectiveRenderMode === "ansi") {
+            const frame = renderer.renderCurrentFrame();
+            if (typeof frame === "string") setAnsiFrame(frame);
+          }
+          onFrame?.(idx);
+        },
         onComplete,
       });
 
@@ -92,8 +114,13 @@ export function Rune({
 
       rendererRef.current = renderer;
       setStatus("ready");
+
+      if (effectiveRenderMode === "ansi") {
+        const frame = renderer.renderCurrentFrame();
+        if (typeof frame === "string") setAnsiFrame(frame);
+      }
     },
-    [fps, loop, onFrame, onComplete, renderMode],
+    [fps, loop, onFrame, onComplete, effectiveRenderMode, colored],
   );
 
   const resolveUrl = useCallback((): string | null => {
@@ -106,8 +133,8 @@ export function Rune({
     if (hasLoadedRef.current) return;
     hasLoadedRef.current = true;
 
-    if (data) {
-      initRenderer(data);
+    if (effectiveData) {
+      initRenderer(effectiveData);
       return;
     }
 
@@ -126,7 +153,14 @@ export function Rune({
         onError?.(err instanceof Error ? err : new Error(String(err)));
       }
     }
-  }, [data, resolveUrl, initRenderer, onError]);
+  }, [effectiveData, resolveUrl, initRenderer, onError]);
+
+  // Use useEffect for initial load in non-browser env
+  useEffect(() => {
+    if (!isBrowser && effectiveData) {
+      load();
+    }
+  }, [isBrowser, effectiveData, load]);
 
   useIntersectionObserver(containerRef, load, { rootMargin: "400px" });
 
@@ -134,10 +168,12 @@ export function Rune({
     const renderer = rendererRef.current;
     if (!renderer || status !== "ready") return;
 
-    if (displayRef.current) {
+    if (displayRef.current && effectiveRenderMode !== "ansi") {
       renderer.attach(displayRef.current);
       renderer.renderCurrentFrame();
     }
+
+    if (!isBrowser) return;
 
     const reducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
@@ -176,7 +212,7 @@ export function Rune({
       window.removeEventListener("blur", handleBlur);
       renderer.stop();
     };
-  }, [status, playing]);
+  }, [status, playing, isBrowser, effectiveRenderMode]);
 
   useIsomorphicLayoutEffect(() => {
     const renderer = rendererRef.current;
@@ -184,11 +220,18 @@ export function Rune({
     renderer.updateOptions({
       fps: fps ?? animationDataRef.current?.meta.fps ?? 30,
       loop,
-      renderMode,
-      onFrame,
+      renderMode: effectiveRenderMode,
+      colored,
+      onFrame: (idx) => {
+        if (effectiveRenderMode === "ansi") {
+          const frame = renderer.renderCurrentFrame();
+          if (typeof frame === "string") setAnsiFrame(frame);
+        }
+        onFrame?.(idx);
+      },
       onComplete,
     });
-  }, [fps, loop, onFrame, onComplete, renderMode]);
+  }, [fps, loop, onFrame, onComplete, effectiveRenderMode, colored]);
 
   useIsomorphicLayoutEffect(() => {
     const renderer = rendererRef.current;
@@ -199,6 +242,27 @@ export function Rune({
       renderer.stop();
     }
   }, [playing, status]);
+
+  if (effectiveRenderMode === "ansi") {
+    // In Ink, we just return a Text component or similar. 
+    // But since this package is shared, we should probably return 
+    // something that works in both. In Node/Ink, we just want the string.
+    // However, React components must return ReactElements.
+    // For Ink, we'll use a fragment with the string which Ink's 
+    // reconciler will handle if it's inside a <Text> component.
+    // To make it easy, let's wrap it in a div for browser and let Ink handle the string.
+    return isBrowser ? (
+      <div
+        ref={containerRef}
+        className={className}
+        style={{ ...containerStyle, ...style }}
+      >
+        {ansiFrame}
+      </div>
+    ) : (
+      (ansiFrame as any)
+    );
+  }
 
   return (
     <div

@@ -1,6 +1,6 @@
 import type { ColoredRunSegment } from "./parser";
 
-export type RenderMode = "auto" | "dom" | "canvas";
+export type RenderMode = "auto" | "dom" | "canvas" | "ansi";
 
 export interface RendererOptions {
   fps: number;
@@ -19,23 +19,23 @@ export class RuneRenderer {
   private coloredFrames: ColoredRunSegment[][][] = [];
   private changedRowsByFrame: number[][] = [];
   private frameIndex = 0;
-  private animationId: number | null = null;
+  private animationId: any = null;
   private lastFrameTime = -1;
   private lastRenderedFrameIndex = -1;
   private forceFullFrameRender = true;
-  private element: HTMLElement | null = null;
+  private element: any = null;
   private options: RendererOptions;
 
-  private lineEls: HTMLDivElement[] = [];
-  private spanEls: HTMLSpanElement[][] = [];
+  private lineEls: any[] = [];
+  private spanEls: any[][] = [];
   private cachedText: string[][] = [];
   private cachedColors: string[][] = [];
   private rowVisible: boolean[] = [];
   private spanVisible: boolean[][] = [];
 
   private usingCanvas = false;
-  private canvasEl: HTMLCanvasElement | null = null;
-  private canvasCtx: CanvasRenderingContext2D | null = null;
+  private canvasEl: any = null;
+  private canvasCtx: any = null;
   private canvasCharWidth = 0;
   private canvasLineHeight = 0;
   private canvasWidthCss = 0;
@@ -60,33 +60,46 @@ export class RuneRenderer {
     this.resetFrameProgress();
   }
 
-  setColoredFrames(frames: ColoredRunSegment[][][], changedRowsByFrame: number[][] = []) {
+  setColoredFrames(
+    frames: ColoredRunSegment[][][],
+    changedRowsByFrame: number[][] = [],
+  ) {
     this.coloredFrames = frames;
     this.plainFrames = [];
     this.changedRowsByFrame = changedRowsByFrame;
     this.resetFrameProgress();
   }
 
-  attach(element: HTMLElement) {
+  attach(element: any) {
     this.element = element;
-    element.textContent = "";
-    this.resetDomCaches();
-    this.destroyCanvas();
-    this.usingCanvas = this.resolveRenderMode() === "canvas" &&
-      this.coloredFrames.length > 0;
-    if (this.usingCanvas) {
-      this.setupCanvas();
+    if (this.options.renderMode !== "ansi") {
+      if (element && typeof element.textContent !== "undefined") {
+        element.textContent = "";
+      }
+      this.resetDomCaches();
+      this.destroyCanvas();
+      this.usingCanvas =
+        this.resolveRenderMode() === "canvas" && this.coloredFrames.length > 0;
+      if (this.usingCanvas) {
+        this.setupCanvas();
+      }
     }
   }
 
   detach() {
     this.stop();
     this.element = null;
-    this.resetDomCaches();
-    this.destroyCanvas();
+    if (this.options.renderMode !== "ansi") {
+      this.resetDomCaches();
+      this.destroyCanvas();
+    }
   }
 
-  renderCurrentFrame() {
+  renderCurrentFrame(): string | void {
+    if (this.options.renderMode === "ansi") {
+      return this.renderAnsiFrame();
+    }
+
     if (!this.element) return;
     if (this.usingCanvas && this.coloredFrames.length > 0) {
       this.renderColoredFrameCanvas();
@@ -106,12 +119,24 @@ export class RuneRenderer {
   start() {
     if (this.animationId !== null) return;
     this.lastFrameTime = -1;
-    this.animationId = requestAnimationFrame(this.tick);
+    if (typeof requestAnimationFrame !== "undefined") {
+      this.animationId = requestAnimationFrame(this.tick);
+    } else {
+      // Fallback for Node
+      const start = Date.now();
+      this.animationId = setInterval(() => {
+        this.tick(Date.now() - start);
+      }, 1000 / this.options.fps);
+    }
   }
 
   stop() {
     if (this.animationId === null) return;
-    cancelAnimationFrame(this.animationId);
+    if (typeof cancelAnimationFrame !== "undefined") {
+      cancelAnimationFrame(this.animationId);
+    } else {
+      clearInterval(this.animationId);
+    }
     this.animationId = null;
   }
 
@@ -139,6 +164,30 @@ export class RuneRenderer {
   private renderColoredPlainFrame() {
     if (!this.element || this.plainFrames.length === 0) return;
     this.element.innerHTML = this.plainFrames[this.frameIndex];
+  }
+
+  private renderAnsiFrame(): string {
+    if (this.coloredFrames.length > 0) {
+      const frame = this.coloredFrames[this.frameIndex];
+      return frame
+        .map((row) => {
+          return row
+            .map((seg) => {
+              if (this.options.colored && seg.color) {
+                const r = parseInt(seg.color.slice(0, 2), 16);
+                const g = parseInt(seg.color.slice(2, 4), 16);
+                const b = parseInt(seg.color.slice(4, 6), 16);
+                return `\x1b[38;2;${r};${g};${b}m${seg.text}\x1b[0m`;
+              }
+              return seg.text;
+            })
+            .join("");
+        })
+        .join("\n");
+    } else if (this.plainFrames.length > 0) {
+      return this.plainFrames[this.frameIndex];
+    }
+    return "";
   }
 
   private renderColoredFrameDom() {
@@ -228,7 +277,8 @@ export class RuneRenderer {
   }
 
   private renderColoredFrameCanvas() {
-    if (!this.canvasCtx || !this.canvasEl || this.coloredFrames.length === 0) return;
+    if (!this.canvasCtx || !this.canvasEl || this.coloredFrames.length === 0)
+      return;
     const frame = this.coloredFrames[this.frameIndex];
     const rowsToRender = this.getRowsToRender(frame.length);
     if (rowsToRender.length === 0) {
@@ -242,10 +292,19 @@ export class RuneRenderer {
     for (let i = 0; i < rowsToRender.length; i++) {
       const row = rowsToRender[i];
       const y = row * this.canvasLineHeight;
-      this.canvasCtx.clearRect(0, y, this.canvasWidthCss, this.canvasLineHeight);
+      this.canvasCtx.clearRect(
+        0,
+        y,
+        this.canvasWidthCss,
+        this.canvasLineHeight,
+      );
       let x = 0;
       const segments = frame[row];
-      for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex++) {
+      for (
+        let segmentIndex = 0;
+        segmentIndex < segments.length;
+        segmentIndex++
+      ) {
         const segment = segments[segmentIndex];
         this.canvasCtx.fillStyle = segment.color
           ? `#${segment.color}`
@@ -269,7 +328,9 @@ export class RuneRenderer {
     const computed = getComputedStyle(this.element);
     const fontSize = Number.parseFloat(computed.fontSize) || 10;
     const parsedLineHeight = Number.parseFloat(computed.lineHeight);
-    const lineHeight = Number.isFinite(parsedLineHeight) ? parsedLineHeight : fontSize;
+    const lineHeight = Number.isFinite(parsedLineHeight)
+      ? parsedLineHeight
+      : fontSize;
     context.font = `${fontSize}px ${computed.fontFamily}`;
     context.textBaseline = "top";
     this.canvasCharWidth = context.measureText("M").width || fontSize * 0.6;
@@ -278,7 +339,8 @@ export class RuneRenderer {
     const rows = this.options.rows ?? this.inferRows();
     this.canvasWidthCss = Math.max(1, this.canvasCharWidth * columns);
     this.canvasHeightCss = Math.max(1, this.canvasLineHeight * rows);
-    const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+    const dpr =
+      typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
     canvas.style.width = `${this.canvasWidthCss}px`;
     canvas.style.height = `${this.canvasHeightCss}px`;
     canvas.width = Math.max(1, Math.round(this.canvasWidthCss * dpr));
@@ -347,6 +409,7 @@ export class RuneRenderer {
   private resolveRenderMode(): "dom" | "canvas" {
     const mode = this.options.renderMode ?? "auto";
     if (mode === "dom" || mode === "canvas") return mode;
+    if (mode === "ansi") return "dom"; // Should not happen with current logic
     const columns = this.options.columns ?? this.inferColumns();
     const rows = this.options.rows ?? this.inferRows();
     const avgSegments = this.options.avgSegmentsPerFrame ?? 0;
@@ -374,9 +437,10 @@ export class RuneRenderer {
 
   private tick = (time: number) => {
     const frameTime = 1000 / this.options.fps;
-    const totalFrames = this.coloredFrames.length > 0
-      ? this.coloredFrames.length
-      : this.plainFrames.length;
+    const totalFrames =
+      this.coloredFrames.length > 0
+        ? this.coloredFrames.length
+        : this.plainFrames.length;
 
     if (this.lastFrameTime === -1) {
       this.lastFrameTime = time;
@@ -404,6 +468,8 @@ export class RuneRenderer {
       }
     }
 
-    this.animationId = requestAnimationFrame(this.tick);
+    if (typeof requestAnimationFrame !== "undefined") {
+      this.animationId = requestAnimationFrame(this.tick);
+    }
   };
 }
