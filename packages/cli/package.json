@@ -11,8 +11,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
+    "build": "bun build.ts",
+    "dev": "bun build.ts --watch",
+    "clean": "rm -rf dist",
     "test:mask": "tsc --module NodeNext --moduleResolution NodeNext --target ES2020 --outDir .tmp-test --rootDir src src/convertFrame.ts src/convertFrame.mask.test.ts && node --test .tmp-test/convertFrame.mask.test.js"
   },
   "dependencies": {
@@ -20,8 +21,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "tsup": "^8.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.7.3"
   },
   "license": "MIT"
 }

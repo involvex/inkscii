@@ -7,9 +7,9 @@
     "dist"
   ],
   "scripts": {
-    "dev": "tsup --watch --onSuccess 'npm run copyFonts'",
-    "build": "tsup && npm run copyFonts",
-    "copyFonts": "rm -rf dist/fonts && mkdir dist/fonts && cp -a src/fonts/. dist/fonts"
+    "build": "bun build.ts",
+    "dev": "bun build.ts --watch",
+    "clean": "rm -rf dist"
   },
   "types": "./dist/index.d.ts",
   "typings": "./dist/index.d.ts",
@@ -27,14 +27,14 @@
     "hook"
   ],
   "dependencies": {
-    "figlet": "^1.6.0"
+    "figlet": "^1.8.0"
   },
   "devDependencies": {
-    "@types/figlet": "^1.5.6",
-    "@types/resolve": "^1.20.2"
+    "@types/figlet": "^1.7.0",
+    "typescript": "^5.7.3"
   },
   "peerDependencies": {
-    "react": ">=17.0.0"
+    "react": ">=18"
   },
   "license": "MIT"
 }

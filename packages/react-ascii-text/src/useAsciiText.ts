@@ -99,8 +99,8 @@ export function useAsciiText({
   isAnimated = true,
   isPaused = false,
   text = ["React", "ASCII", "Text"],
-}: UseAsciiTextArgs): React.MutableRefObject<HTMLPreElement | undefined> {
-  const outputRef = useRef<HTMLPreElement>();
+}: UseAsciiTextArgs): React.RefObject<HTMLPreElement | null> {
+  const outputRef = useRef<HTMLPreElement>(null);
   const renderRef = useRef<renderRef>({
     animationFrameId: 0,
     animationIndex: 0,
